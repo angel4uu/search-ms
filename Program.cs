@@ -24,11 +24,13 @@ try
     // Configuration is already loaded by default
     logger.LogInformation("Configuration loaded successfully");
 
-    // Extract and configure Azure Key Vault if endpoint is provided
-    var keyVaultEndpoint = builder.Configuration["AzureKeyVault:KeyVaultEndpoint"];
-    if (!string.IsNullOrEmpty(keyVaultEndpoint))
+    //  Environment-based Key Vault configuration
+    if (builder.Environment.IsProduction())
     {
-        logger.LogInformation("Configuring Azure Key Vault at {Endpoint}", keyVaultEndpoint);
+        // Production: Always use Key Vault
+        var keyVaultEndpoint = builder.Configuration["AzureKeyVault:KeyVaultEndpoint"];
+        
+        logger.LogInformation("Production: Configuring Azure Key Vault at {Endpoint}", keyVaultEndpoint);
         builder.Configuration.AddAzureKeyVault(
             new Uri(keyVaultEndpoint),
             new DefaultAzureCredential());
@@ -36,7 +38,23 @@ try
     }
     else
     {
-        logger.LogWarning("Azure Key Vault endpoint not configured, skipping Key Vault integration");
+        // Development: Optional Key Vault
+        var keyVaultEndpoint = builder.Configuration["AzureKeyVault:KeyVaultEndpoint"];
+        if (!string.IsNullOrEmpty(keyVaultEndpoint))
+        {
+            try
+            {
+                logger.LogInformation("Development: Attempting Azure Key Vault at {Endpoint}", keyVaultEndpoint);
+                builder.Configuration.AddAzureKeyVault(
+                    new Uri(keyVaultEndpoint),
+                    new DefaultAzureCredential());
+                logger.LogInformation("Azure Key Vault configured successfully");
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Key Vault unavailable in development, using local configuration");
+            }
+        }
     }
 
     // Bind settings classes to configuration sections
