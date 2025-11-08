@@ -7,16 +7,17 @@ pool:
   vmImage: "ubuntu-latest"
 
 variables:
-  acrName: "acrsearchms"
-  acrLoginServer: "acrsearchms.azurecr.io"
-  imageName: "searchms"
-  webAppName: "searchms-app"
-  resourceGroup: "ms-search-rg"
+  acrName: "acrsearchms2025"
+  acrLoginServer: "acrsearchms2025.azurecr.io"
+  imageName: "img-searchms"
+  webAppName: "app-searchms"
+  resourceGroup: "rg-searchms"
 
 stages:
   - stage: Build
     jobs:
       - job: BuildAndPush
+        displayName: Build and push image to ACR
         steps:
           - task: Docker@2
             displayName: Build and push image
@@ -32,15 +33,18 @@ stages:
   - stage: Deploy
     dependsOn: Build
     jobs:
-      - deployment: DeployToAzure
-        environment: "production"
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - task: AzureWebAppContainer@1
-                  displayName: Deploy to Azure App Service
-                  inputs:
-                    azureSubscription: "Azure-ServiceConnection"
-                    appName: $(webAppName)
-                    containers: $(acrLoginServer)/$(imageName):$(Build.BuildId)
+      - job: DeployToContainerApp
+        displayName: Deploy to Azure Container App
+        steps:
+          - task: AzureCLI@2
+            displayName: Deploy new image to Azure Container App
+            inputs:
+              azureSubscription: "Azure-ServiceConnection"
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                echo "Updating container app image to: $(acrLoginServer)/$(imageName):$(Build.BuildId)"
+                az containerapp update \
+                  --name $(webAppName) \
+                  --resource-group $(resourceGroup) \
+                  --image $(acrLoginServer)/$(imageName):$(Build.BuildId)
