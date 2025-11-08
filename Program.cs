@@ -132,3 +132,5 @@ catch (Exception ex)
     logger.LogCritical(ex, "Application failed to start");
     throw;
 }
+
+//Comment to test pipeline
