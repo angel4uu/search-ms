@@ -13,7 +13,7 @@ services:
       ASPNETCORE_URLS: ${ASPNETCORE_URLS:-http://+:8080}
 
       # Key Vault
-      AzureKeyVault__KeyVaultEndpoint: ${AZURE_KEYVAULT_ENDPOINT}
+      KeyVault__Endpoint: ${AZURE_KEYVAULT_ENDPOINT}
 
       # Database (Cloud)
       Database__ConnectionString: ${DATABASE_CONNECTION_STRING}

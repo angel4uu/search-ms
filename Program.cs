@@ -32,11 +32,19 @@ try
 {
     logger.LogInformation("Starting application in {Environment} environment", builder.Environment.EnvironmentName);
 
+    // Bind KeyVaultSettings early
+    builder.Services.Configure<KeyVaultSettings>(
+        builder.Configuration.GetSection(KeyVaultSettings.SectionName));
+
+    var kvSettings = builder.Configuration
+        .GetSection(KeyVaultSettings.SectionName)
+        .Get<KeyVaultSettings>();
+
     //  Environment-based Key Vault configuration
     if (builder.Environment.IsProduction())
     {
         // Production: Always use Key Vault
-        var keyVaultEndpoint = builder.Configuration["AzureKeyVault:KeyVaultEndpoint"];
+        var keyVaultEndpoint = kvSettings?.Endpoint;
 
         if (string.IsNullOrEmpty(keyVaultEndpoint))
         {
@@ -45,14 +53,13 @@ try
 
         logger.LogInformation("Production: Configuring Azure Key Vault at {Endpoint}", keyVaultEndpoint);
         builder.Configuration
-            .AddAzureKeyVault(new Uri(keyVaultEndpoint), new DefaultAzureCredential())
-            .AddEnvironmentVariables();
+            .AddAzureKeyVault(new Uri(keyVaultEndpoint), new DefaultAzureCredential());
         logger.LogInformation("Azure Key Vault configured successfully");
     }
     else
     {
         // Development: Use environment variable
-        var keyVaultEndpoint = builder.Configuration["AzureKeyVault:KeyVaultEndpoint"];
+        var keyVaultEndpoint = builder.Configuration["KeyVault:Endpoint"];
         logger.LogInformation("Development: Using local configuration (environment variables)");
     }
 
