@@ -88,6 +88,8 @@ try
     app.MapControllers();
 
     logger.LogInformation("Application starting on {Environment}", app.Environment.EnvironmentName);
+    app.MapGet("/", () => Results.Ok("Healthy"));
+    app.MapGet("/scalar/v1", () => Results.Ok("Healthy"));
     app.Run();
 }
 catch (Exception ex)
