@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  # .NET Application (No Database - connects to cloud DB)
+  searchms-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: searchms-api
+    environment:
+      # ASP.NET Core
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: ${ASPNETCORE_URLS:-http://+:8080}
+
+      # Key Vault
+      AzureKeyVault__KeyVaultEndpoint: ${AZURE_KEYVAULT_ENDPOINT}
+
+      # Database (Cloud)
+      Database__ConnectionString: ${DATABASE_CONNECTION_STRING}
+
+      # AI Search
+      AISearch__Endpoint: ${AI_SEARCH_ENDPOINT}
+      AISearch__ApiKey: ${AI_SEARCH_API_KEY}
+      AISearch__IndexName: ${AI_SEARCH_INDEX_NAME}
+
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

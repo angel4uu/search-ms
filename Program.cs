@@ -21,14 +21,18 @@ var logger = loggerFactory.CreateLogger("Startup");
 
 try
 {
-    // Configuration is already loaded by default
-    logger.LogInformation("Configuration loaded successfully");
+    logger.LogInformation("Starting application in {Environment} environment", builder.Environment.EnvironmentName);
 
     //  Environment-based Key Vault configuration
     if (builder.Environment.IsProduction())
     {
         // Production: Always use Key Vault
         var keyVaultEndpoint = builder.Configuration["AzureKeyVault:KeyVaultEndpoint"];
+
+        if (string.IsNullOrEmpty(keyVaultEndpoint))
+        {
+            throw new InvalidOperationException("Key Vault endpoint is required in production");
+        }
         
         logger.LogInformation("Production: Configuring Azure Key Vault at {Endpoint}", keyVaultEndpoint);
         builder.Configuration.AddAzureKeyVault(
@@ -38,23 +42,9 @@ try
     }
     else
     {
-        // Development: Optional Key Vault
+        // Development: Use environment variable
         var keyVaultEndpoint = builder.Configuration["AzureKeyVault:KeyVaultEndpoint"];
-        if (!string.IsNullOrEmpty(keyVaultEndpoint))
-        {
-            try
-            {
-                logger.LogInformation("Development: Attempting Azure Key Vault at {Endpoint}", keyVaultEndpoint);
-                builder.Configuration.AddAzureKeyVault(
-                    new Uri(keyVaultEndpoint),
-                    new DefaultAzureCredential());
-                logger.LogInformation("Azure Key Vault configured successfully");
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Key Vault unavailable in development, using local configuration");
-            }
-        }
+        logger.LogInformation("Development: Using local configuration (environment variables)");
     }
 
     // Bind settings classes to configuration sections
@@ -63,8 +53,6 @@ try
     builder.Services.Configure<DatabaseSettings>(
         builder.Configuration.GetSection(DatabaseSettings.SectionName));
     logger.LogInformation("Settings configured successfully");
-
-    // Add infrastructure services
 
     // Configure Entity Framework with PostgreSQL
     builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
@@ -114,17 +102,13 @@ try
     logger.LogInformation("Application built successfully, starting configuration");
 
     // Configure the HTTP request pipeline
-    if (app.Environment.IsDevelopment())
-    {
-        app.MapOpenApi();
-        app.MapScalarApiReference();
-        logger.LogInformation("Development environment: OpenAPI and Scalar enabled");
-    }
+    app.MapScalarApiReference();
+    logger.LogInformation("Scalar UI at /scalar/v1");
 
     app.UseAuthorization();
     app.MapControllers();
 
-    logger.LogInformation("Starting application on {Environment}", app.Environment.EnvironmentName);
+    logger.LogInformation("Application starting on {Environment}", app.Environment.EnvironmentName);
     app.Run();
 }
 catch (Exception ex)
