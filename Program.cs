@@ -8,12 +8,15 @@ using SearchMS.Repositories;
 using SearchMS.Services;
 using SearchMS.Clients;
 using Scalar.AspNetCore;
-using Azure.Extensions.AspNetCore.Configuration.Secrets;
 
 var builder = WebApplication.CreateBuilder(args);
 
+//Load configuration from environment variables
+builder.Configuration.AddEnvironmentVariables();
+
+
 // Create logger using LoggerFactory
-using var loggerFactory = LoggerFactory.Create(loggingBuilder => 
+using var loggerFactory = LoggerFactory.Create(loggingBuilder =>
 {
     loggingBuilder.AddConsole();
 });
