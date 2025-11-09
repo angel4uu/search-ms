@@ -28,7 +28,7 @@ foreach (var kvp in builder.Configuration.AsEnumerable())
 }
 
 
-try
+try 
 {
     logger.LogInformation("Starting application in {Environment} environment", builder.Environment.EnvironmentName);
 
@@ -44,9 +44,9 @@ try
         }
 
         logger.LogInformation("Production: Configuring Azure Key Vault at {Endpoint}", keyVaultEndpoint);
-        builder.Configuration.AddAzureKeyVault(
-            new Uri(keyVaultEndpoint),
-            new DefaultAzureCredential());
+        builder.Configuration
+            .AddAzureKeyVault(new Uri(keyVaultEndpoint), new DefaultAzureCredential())
+            .AddEnvironmentVariables();
         logger.LogInformation("Azure Key Vault configured successfully");
     }
     else
