@@ -26,30 +26,6 @@ try
 {
     logger.LogInformation("Starting application in {Environment} environment", builder.Environment.EnvironmentName);
 
-    //  Environment-based Key Vault configuration
-    if (builder.Environment.IsProduction())
-    {
-        // Production: Always use Key Vault
-        var keyVaultEndpoint = builder.Configuration["KeyVault__Endpoint"];
-        logger.LogInformation("Resolved KeyVault:Endpoint = {Value}", keyVaultEndpoint);
-
-        if (string.IsNullOrEmpty(keyVaultEndpoint))
-        {
-            throw new InvalidOperationException("Key Vault endpoint is required in production");
-        }
-
-        logger.LogInformation("Production: Configuring Azure Key Vault at {Endpoint}", keyVaultEndpoint);
-        builder.Configuration
-            .AddAzureKeyVault(new Uri(keyVaultEndpoint), new ManagedIdentityCredential());
-        logger.LogInformation("Azure Key Vault configured successfully");
-    }
-    else
-    {
-        // Development: Use environment variable
-        var keyVaultEndpoint = builder.Configuration["KeyVault__Endpoint"];
-        logger.LogInformation("Development: Using local configuration (environment variables)");
-    }
-
     // Bind settings classes to configuration sections
     builder.Services.Configure<AISearchSettings>(
         builder.Configuration.GetSection(AISearchSettings.SectionName));

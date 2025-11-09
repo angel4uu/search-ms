@@ -2,7 +2,7 @@ namespace SearchMS.Settings
 {
     public class AISearchSettings
     {
-        public const string SectionName = "AzureAISearch";
+        public const string SectionName = "AISearch";
  
         public string Endpoint { get; set; } = string.Empty;    
         public string ApiKey { get; set; } = string.Empty;
