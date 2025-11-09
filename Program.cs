@@ -21,14 +21,8 @@ using var loggerFactory = LoggerFactory.Create(loggingBuilder =>
 });
 var logger = loggerFactory.CreateLogger("Startup");
 
-// Log all configuration key-value pairs
-foreach (var kvp in builder.Configuration.AsEnumerable())
-{
-    logger.LogInformation("Config Key: {Key} = {Value}", kvp.Key, kvp.Value);
-}
 
-
-try 
+try
 {
     logger.LogInformation("Starting application in {Environment} environment", builder.Environment.EnvironmentName);
 
@@ -37,6 +31,7 @@ try
     {
         // Production: Always use Key Vault
         var keyVaultEndpoint = builder.Configuration["KeyVault__Endpoint"];
+        logger.LogInformation("Resolved KeyVault:Endpoint = {Value}", keyVaultEndpoint);
 
         if (string.IsNullOrEmpty(keyVaultEndpoint))
         {
@@ -45,7 +40,7 @@ try
 
         logger.LogInformation("Production: Configuring Azure Key Vault at {Endpoint}", keyVaultEndpoint);
         builder.Configuration
-            .AddAzureKeyVault(new Uri(keyVaultEndpoint), new DefaultAzureCredential());
+            .AddAzureKeyVault(new Uri(keyVaultEndpoint), new ManagedIdentityCredential());
         logger.LogInformation("Azure Key Vault configured successfully");
     }
     else
