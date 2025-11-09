@@ -81,6 +81,7 @@ try
     logger.LogInformation("Application built successfully, starting configuration");
 
     // Configure the HTTP request pipeline
+    app.MapOpenApi();
     app.MapScalarApiReference();
     logger.LogInformation("Scalar UI at /scalar/v1");
 
