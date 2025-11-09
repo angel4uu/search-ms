@@ -36,7 +36,7 @@ try
     if (builder.Environment.IsProduction())
     {
         // Production: Always use Key Vault
-        var keyVaultEndpoint = builder.Configuration["KeyVault:Endpoint"];
+        var keyVaultEndpoint = builder.Configuration["KeyVault__Endpoint"];
 
         if (string.IsNullOrEmpty(keyVaultEndpoint))
         {
@@ -51,7 +51,7 @@ try
     else
     {
         // Development: Use environment variable
-        var keyVaultEndpoint = builder.Configuration["KeyVault:Endpoint"];
+        var keyVaultEndpoint = builder.Configuration["KeyVault__Endpoint"];
         logger.LogInformation("Development: Using local configuration (environment variables)");
     }
 
