@@ -32,19 +32,11 @@ try
 {
     logger.LogInformation("Starting application in {Environment} environment", builder.Environment.EnvironmentName);
 
-    // Bind KeyVaultSettings early
-    builder.Services.Configure<KeyVaultSettings>(
-        builder.Configuration.GetSection(KeyVaultSettings.SectionName));
-
-    var kvSettings = builder.Configuration
-        .GetSection(KeyVaultSettings.SectionName)
-        .Get<KeyVaultSettings>();
-
     //  Environment-based Key Vault configuration
     if (builder.Environment.IsProduction())
     {
         // Production: Always use Key Vault
-        var keyVaultEndpoint = kvSettings?.Endpoint;
+        var keyVaultEndpoint = builder.Configuration["KeyVault:Endpoint"];
 
         if (string.IsNullOrEmpty(keyVaultEndpoint))
         {
