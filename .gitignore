@@ -4,3 +4,5 @@ appsettings.Development.json
 .vs/
 .env
 containerapp.yaml
+venv/
+__pycache__/
