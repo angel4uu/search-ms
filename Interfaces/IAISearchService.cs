@@ -2,11 +2,14 @@ using SearchMS.DTOs;
 
 namespace SearchMS.Interfaces
 {
+
     public interface IAISearchService
     {
-        Task<ConnectionTestOutputDto> TestConnectionAsync();
-        Task<SearchProductOutputDto> SearchProductsAsync(SearchProductInputDto input);
-        Task<FilterProductOutputDto> FilterProductsAsync(FilterProductInputDto input);
-        Task<SuggestProductOutputDto> SuggestProductsAsync(SuggestProductInputDto input);
+        // Search with filtering, sorting, and pagination
+        Task<PagedResponseDto<ProductResponseDto>> SearchAsync(SearchRequestDto request);
+        // Autocomplete queries
+        Task<List<string>> AutocompleteAsync(string searchText);
+        // Suggest documents
+        Task<List<ProductResponseDto>> SuggestAsync(string searchText);
     }
 }

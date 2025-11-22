@@ -1,64 +1,77 @@
 using Microsoft.AspNetCore.Mvc;
-using SearchMS.DTOs;
-using SearchMS.Services;
 using SearchMS.Interfaces;
+using SearchMS.DTOs;
 
-namespace SearchMS.Controllers
+namespace SearchMS.Controllers;
+
+[ApiController]
+[Route("api/search")] 
+public class SearchController : ControllerBase
 {
-    [ApiController]
-    [Route("api")]
-    public class AISearchController : ControllerBase
+    private readonly IAISearchService _searchService;
+
+    public SearchController(IAISearchService searchService)
     {
-        private readonly IAISearchService _searchService;
-        private readonly ILogger<AISearchController> _logger;
+        _searchService = searchService;
+    }
 
-        public AISearchController(IAISearchService searchService, ILogger<AISearchController> logger)
+    /// <summary>
+    /// Performs a product search using all available filters and pagination.
+    /// This endpoint uses POST to accept a complex JSON request body.
+    /// </summary>
+    [HttpPost] 
+    public async Task<IActionResult> Search([FromBody] SearchRequestDto request)
+    {
+        try
         {
-            _searchService = searchService;
-            _logger = logger;
+            var results = await _searchService.SearchAsync(request);
+            return Ok(results);
         }
-
-        /// <summary>
-        /// Tests the connection to Azure AI Search
-        /// </summary>
-        [HttpGet("test-connection")]
-        [ProducesResponseType(typeof(ConnectionTestOutputDto), StatusCodes.Status200OK)]
-        public async Task<ActionResult<ConnectionTestOutputDto>> TestConnection()
+        catch (Exception ex)
         {
-            try
-            {
-                var result = await _searchService.TestConnectionAsync();
-                
-                // Return 200 OK even if connection failed - the result object contains the status
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Unexpected error in TestConnection endpoint");
-                
-                return Ok(new ConnectionTestOutputDto
-                {
-                    IsConnected = false,
-                    Message = "❌ Unexpected error occurred",
-                    Timestamp = DateTime.UtcNow,
-                    ErrorDetails = ex.Message
-                });
-            }
+            return StatusCode(500, $"An error occurred: {ex.Message}");
         }
+    }
 
-        // [HttpPost("search")]
-        // public async Task<ActionResult<SearchProductOutputDto>> Search([FromBody] SearchProductInputDto input)
-        // {
-        // }
+    /// <summary>
+    /// Gets autocomplete suggestions for a partial query.
+    /// e.g., /api/search/autocomplete?q=puma
+    /// </summary>
+    [HttpGet("autocomplete")]
+    public async Task<IActionResult> Autocomplete([FromQuery] string q)
+    {
+        if (string.IsNullOrEmpty(q))
+            return BadRequest("Query parameter 'q' is required.");
+        
+        try
+        {
+            var suggestions = await _searchService.AutocompleteAsync(q);
+            return Ok(suggestions);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"An error occurred: {ex.Message}");
+        }
+    }
 
-        // [HttpPost("filter")]
-        // public async Task<ActionResult<FilterProductOutputDto>> Filter([FromBody] FilterProductInputDto input)
-        // {
-        // }
+    /// <summary>
+    /// Gets document suggestions for a query.
+    /// e.g., /api/search/suggest?q=reebok
+    /// </summary>
+    [HttpGet("suggest")] 
+    public async Task<IActionResult> Suggest([FromQuery] string q)
+    {
+        if (string.IsNullOrEmpty(q))
+            return BadRequest("Query parameter 'q' is required.");
 
-        // [HttpPost("suggest")]
-        // public async Task<ActionResult<SuggestProductOutputDto>> Suggest([FromBody] SuggestProductInputDto input)
-        // {
-        // }
+        try
+        {
+            var suggestions = await _searchService.SuggestAsync(q);
+            return Ok(suggestions);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"An error occurred: {ex.Message}");
+        }
     }
 }

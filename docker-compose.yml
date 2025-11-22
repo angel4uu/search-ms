@@ -12,16 +12,13 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_URLS: ${ASPNETCORE_URLS:-http://+:8080}
 
-      # Key Vault
-      KeyVault__Endpoint: ${AZURE_KEYVAULT_ENDPOINT}
-
       # Database (Cloud)
-      Database__ConnectionString: ${DATABASE_CONNECTION_STRING}
+      Database__ConnectionString: ${DB_CONN_CATALOGO}
 
       # AI Search
-      AISearch__Endpoint: ${AI_SEARCH_ENDPOINT}
-      AISearch__ApiKey: ${AI_SEARCH_API_KEY}
-      AISearch__IndexName: ${AI_SEARCH_INDEX_NAME}
+      AISearch__ServiceEndpoint: ${AZURE_SEARCH_SERVICE_ENDPOINT}
+      AISearch__ApiKey: ${AZURE_SEARCH_ADMIN_API_KEY}
+      AISearch__IndexName: ${AZURE_SEARCH_INDEX_NAME}
 
     ports:
       - "8080:8080"

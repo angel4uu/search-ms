@@ -6,13 +6,9 @@ using SearchMS.Data;
 using SearchMS.Interfaces;
 using SearchMS.Repositories;
 using SearchMS.Services;
-using SearchMS.Clients;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
-
-//Load configuration from environment variables
-builder.Configuration.AddEnvironmentVariables();
 
 // Create logger using LoggerFactory
 using var loggerFactory = LoggerFactory.Create(loggingBuilder =>
@@ -26,12 +22,27 @@ try
 {
     logger.LogInformation("Starting application in {Environment} environment", builder.Environment.EnvironmentName);
 
+    //Load configuration from environment variables
+    builder.Configuration.AddEnvironmentVariables();
+
     // Bind settings classes to configuration sections
     builder.Services.Configure<AISearchSettings>(
         builder.Configuration.GetSection(AISearchSettings.SectionName));
     builder.Services.Configure<DatabaseSettings>(
         builder.Configuration.GetSection(DatabaseSettings.SectionName));
     logger.LogInformation("Settings configured successfully");
+
+    // Configure AISearchSettings singleton with validation
+    builder.Services.AddSingleton(sp =>
+    {
+        var settings = sp.GetRequiredService<IOptions<AISearchSettings>>().Value;
+        if (string.IsNullOrEmpty(settings.ServiceEndpoint))
+        {
+            throw new InvalidOperationException(
+                "AISearchSettings:ServiceEndpoint is not configured. Check Docker Compose environment mapping.");
+        }
+        return settings;
+    });
 
     // Configure Entity Framework with PostgreSQL
     builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
@@ -47,28 +58,9 @@ try
         logger.LogInformation("Entity Framework configured with PostgreSQL");
     });
 
-    // HTTP Client for AISearchClient
-    builder.Services.AddHttpClient<IAISearchClient, AISearchClient>((serviceProvider, client) =>
-    {
-        var aiSettings = serviceProvider.GetRequiredService<IOptions<AISearchSettings>>().Value;
-
-        if (string.IsNullOrEmpty(aiSettings.Endpoint))
-        {
-            throw new InvalidOperationException("AI Search endpoint is not configured");
-        }
-
-        if (string.IsNullOrEmpty(aiSettings.ApiKey))
-        {
-            throw new InvalidOperationException("AI Search API key is not configured");
-        }
-
-        client.BaseAddress = new Uri(aiSettings.Endpoint);
-        client.DefaultRequestHeaders.Add("api-key", aiSettings.ApiKey);
-        logger.LogInformation("HTTP Client for AISearchClient configured with endpoint {Endpoint}", aiSettings.Endpoint);
-    });
-
     // Add application services to the container
     builder.Services.AddScoped<IHistorialBusquedaRepository, HistorialBusquedaRepository>();
+    builder.Services.AddScoped<IAISearchRepository, AISearchRepository>();
     builder.Services.AddScoped<IAISearchService, AISearchService>();
     builder.Services.AddScoped<IHistorialBusquedaService, HistorialBusquedaService>();
 
@@ -98,4 +90,3 @@ catch (Exception ex)
     throw;
 }
 
-// Comentario prueba para CICD
