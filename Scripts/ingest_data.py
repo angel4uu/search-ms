@@ -1,3 +1,5 @@
+import concurrent.futures
+import requests
 import pyodbc
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
@@ -6,14 +8,7 @@ from config import config  # Imports the global config instance
 
 def fetch_catalogo_data(conn_str):
     """
-    Fetches and pivots product data from the Catalogo DB to prepare for indexing.
-
-    This query is designed for a bifurcated EAV schema:
-    1. Gets PRODUCT-level attributes (Category, Gender...)
-    2. Gets and AGGREGATES VARIANT-level attributes (Color, Talla...)
-    3. Gets the principal 'imagen' from Producto_Imagen.
-    4. Gets 'tienePromocion' status from the Producto table.
-    5. Gets the MINIMUM 'precio' from all associated Variantes.
+    Fetches and pivots product data from the Catalogo DB.
     """
     print("Fetching and pivoting data from Catalogo DB (bifurcated EAV)...")
     products = []
@@ -72,78 +67,143 @@ def fetch_catalogo_data(conn_str):
                 p."Id", p."Nombre", p."Descripcion", p."IdPromocion";
             """
 
-    with pyodbc.connect(conn_str) as conn:
-        cursor = conn.cursor()
-        cursor.execute(query)
-        rows = cursor.fetchall()
+    try:
+        with pyodbc.connect(conn_str) as conn:
+            cursor = conn.cursor()
+            cursor.execute(query)
+            rows = cursor.fetchall()
 
-        for row in rows:
-            products.append(
-                {
-                    "id": str(row.Id),
-                    "nombre": trim(row.Nombre),
-                    "descripcion": trim(row.Descripcion),
-                    "precio": float(row.Precio) if row.Precio is not None else None,
-                    "imagen": trim(row.Imagen),
-                    "tienePromocion": row.TienePromocion is True,
-                    # These fields come from the pivoted query
-                    "categoria": trim(row.Categoria),
-                    "genero": trim(row.Genero),
-                    "deporte": trim(row.Deporte),
-                    "tipo": trim(row.Tipo),
-                    "coleccion": trim(row.Coleccion),
-                    # Split the aggregated strings back into arrays for the index
-                    "color": (
-                        [trim(c) for c in row.Color.split(",")] if row.Color else []
-                    ),
-                    "talla": (
-                        [trim(t) for t in row.Talla.split(",")] if row.Talla else []
-                    ),
-                }
-            )
+            for row in rows:
+                products.append(
+                    {
+                        "id": str(row.Id),
+                        "nombre": trim(row.Nombre),
+                        "descripcion": trim(row.Descripcion),
+                        "precio": float(row.Precio) if row.Precio is not None else 0.0,
+                        "imagen": trim(row.Imagen),
+                        "tienePromocion": row.TienePromocion is True,
+                        "categoria": trim(row.Categoria),
+                        "genero": trim(row.Genero),
+                        "deporte": trim(row.Deporte),
+                        "tipo": trim(row.Tipo),
+                        "coleccion": trim(row.Coleccion),
+                        "color": (
+                            [trim(c) for c in row.Color.split(",")] if row.Color else []
+                        ),
+                        "talla": (
+                            [trim(t) for t in row.Talla.split(",")] if row.Talla else []
+                        ),
+                        "calificacion": 0.0,
+                    }
+                )
+    except pyodbc.Error as ex:
+        print(f"Database Error: {ex}")
+        raise
 
-    print(f"Fetched and pivoted {len(products)} products.")
+    print(f"Fetched {len(products)} products from DB.")
     return products
 
 
-def fetch_reseñas_data():
+def fetch_single_rating(session, product_id):
     """
-    Calls the Reseñas microservice to get average ratings per product.
+    Fetches the rating for a single product using the provided session.
+    Returns a tuple (product_id, rating).
     """
-    print("Fetching average ratings from Reseñas MS...")
-    rating_dict = {}
+    url = f"{config.resenas_api_base_url}/api/productos/{product_id}/calificacion"
+    try:
+        response = session.get(url, timeout=5)  # 5 second timeout
+        if response.status_code == 200:
+            try:
+                val = float(response.text)
+                return product_id, (
+                    val["calificacionPromedio"]
+                    if "calificacionPromedio" in val
+                    else 0.0
+                )
+            except ValueError:
+                # Handle cases where response isn't a number
+                return product_id, 0.0
+        elif response.status_code == 404:
+            # Product has no reviews yet
+            return product_id, 0.0
+        else:
+            print(
+                f"Warning: API returned {response.status_code} for product {product_id}"
+            )
+            return product_id, 0.0
+    except requests.RequestException as e:
+        print(f"Error fetching rating for {product_id}: {e}")
+        return product_id, 0.0
 
-    return rating_dict
+
+def enrich_products_with_ratings(products):
+    """
+    Orchestrates concurrent API calls to fetch ratings.
+    """
+    print("Fetching ratings from Reseñas MS (Concurrent)...")
+
+    # Map for O(1) lookups
+    product_map = {p["id"]: p for p in products}
+    product_ids = list(product_map.keys())
+
+    # Use a Session for connection pooling (Performance boost)
+    with requests.Session() as session:
+        # ThreadPoolExecutor allows us to make multiple network requests in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+            # Create a future for each product
+            futures = [
+                executor.submit(fetch_single_rating, session, pid)
+                for pid in product_ids
+            ]
+
+            for future in concurrent.futures.as_completed(futures):
+                pid, rating = future.result()
+                if pid in product_map:
+                    product_map[pid]["calificacion"] = rating
+
+    print("Ratings enrichment complete.")
+    return list(product_map.values())
 
 
 def ingest_data():
     """Full ingestion pipeline."""
-
     print("Starting full data ingestion...")
-    print(f"Connected to Catalogo DB: {config.db_conn_catalogo}")
 
-    # Get data from all sources
+    # Fetch from DB
     products = fetch_catalogo_data(config.db_conn_catalogo)
-    reseñas = fetch_reseñas_data()
 
-    print("Merging data from all sources...")
+    if not products:
+        print("No products found. Exiting.")
+        return
 
-    # Augment products with rating data
-    for product in products:
-        # Default to 5.0 cause not implemented yet
-        product["calificacion"] = 5.0
+    # Enrich with API data
+    products_enriched = enrich_products_with_ratings(products)
 
-    # Set up the SearchClient
-    search_client = SearchClient(
-        config.azure_search_endpoint,
-        config.azure_search_index_name,
-        AzureKeyCredential(config.azure_search_admin_key),
+    # Upload to Azure AI Search
+    print(
+        f"Uploading {len(products_enriched)} documents to Index '{config.azure_search_index_name}'..."
     )
 
-    # Upload documents
-    search_client.merge_or_upload_documents(documents=products)
+    try:
+        search_client = SearchClient(
+            config.azure_search_endpoint,
+            config.azure_search_index_name,
+            AzureKeyCredential(config.azure_search_admin_key),
+        )
 
-    print("Data ingestion completed successfully.")
+        # Batching upload
+        batch_size = 1000
+        for i in range(0, len(products_enriched), batch_size):
+            batch = products_enriched[i : i + batch_size]
+            result = search_client.merge_or_upload_documents(documents=batch)
+            print(
+                f"Uploaded batch {i} to {i+len(batch)}. Success: {result[0].succeeded}"
+            )
+
+    except Exception as e:
+        print(f"Error uploading to Azure Search: {e}")
+
+    print("Data ingestion pipeline finished.")
 
 
 def trim(value):

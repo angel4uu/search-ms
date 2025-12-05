@@ -25,6 +25,10 @@ class Config:
         )
         self.db_conn_catalogo: Final[str] = self._get_required_env("DB_CONN_CATALOGO")
 
+        self.resenas_api_base_url: Final[str] = self._get_required_env(
+            "RESENAS_API_BASE_URL"
+        )
+
     def _get_required_env(self, var_name: str) -> str:
         """Helper to get an env var and raise an error if it's missing."""
         value = os.getenv(var_name)
