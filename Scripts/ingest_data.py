@@ -31,7 +31,7 @@ def fetch_catalogo_data(conn_str):
 
                 -- --- 3. Get Promotion Status (PostgreSQL syntax) ---
                 CASE 
-                    WHEN p."IdPromocion" IS NOT NULL THEN true
+                    WHEN p."PromocionId" IS NOT NULL THEN true
                     ELSE false
                 END AS "TienePromocion",
 
@@ -56,15 +56,17 @@ def fetch_catalogo_data(conn_str):
             LEFT JOIN "AtributoValor" AS av_prod ON pa."AtributoValorId" = av_prod."Id"
             LEFT JOIN "Atributo" AS a_prod ON av_prod."AtributoId" = a_prod."Id"
 
-            -- --- Joins for VARIANT Attributes (CRITICAL for Precio, Color, Talla) ---
-            LEFT JOIN "Variante" AS v ON p."Id" = v."ProductoId"
+            -- Join only products with variants --
+            INNER JOIN "Variante" AS v ON p."Id" = v."ProductoId"
+
+            -- --- Joins for VARIANT Attributes ---
             LEFT JOIN "VarianteAtributo" AS va ON v."Id" = va."VarianteId"
             LEFT JOIN "AtributoValor" AS av_var ON va."AtributoValorId" = av_var."Id"
             LEFT JOIN "Atributo" AS a_var ON av_var."AtributoId" = a_var."Id"
 
             GROUP BY
                 -- Group by all the core product fields
-                p."Id", p."Nombre", p."Descripcion", p."IdPromocion";
+                p."Id", p."Nombre", p."Descripcion", p."PromocionId";
             """
 
     try:
